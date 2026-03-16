@@ -9,6 +9,8 @@
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <tuple>
+#include <type_traits>
 #include <vector>
 
 #ifdef _WIN32
@@ -32,10 +34,13 @@ public:
 
   template <typename Func, typename... Args>
   auto Submit(Func &&func, Args &&...args)
-      -> std::future<decltype(func(args...))> {
-    using return_type = decltype(func(args...));
+      -> std::future<std::invoke_result_t<std::decay_t<Func>, std::decay_t<Args>...>> {
+    using return_type = std::invoke_result_t<std::decay_t<Func>, std::decay_t<Args>...>;
     auto task = std::make_shared<std::packaged_task<return_type()>>(
-        std::bind(std::forward<Func>(func), std::forward<Args>(args)...));
+        [f = std::forward<Func>(func),
+         args = std::make_tuple(std::forward<Args>(args)...)]() mutable {
+          return std::apply(std::move(f), std::move(args));
+        });
     std::future<return_type> result = task->get_future();
 
     auto wrapper = [task]() { (*task)(); };
@@ -47,9 +52,10 @@ public:
 private:
   void EnqueueReal(std::function<void()> task);
 
-  struct WorkQueue {
+  struct alignas(64) WorkQueue {
     std::deque<std::function<void()>> tasks;
     std::mutex mtx;
+    std::atomic<size_t> count{0};
   };
 
   std::vector<std::unique_ptr<WorkQueue>> queues;
