@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
-project(ThreadPool_Project VERSION 1.0.0 LANGUAGES CXX)
+project(ThreadPool VERSION 0.0.1 LANGUAGES CXX)
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -20,24 +23,49 @@ add_library(ThreadPool SHARED
 # 链接线程库
 target_link_libraries(ThreadPool PRIVATE Threads::Threads)
 
-# 指定头文件包含路径
-# 当其他项目引入此库时，能正确找到头文件
+# 在源码树和安装树都暴露头文件目录
 target_include_directories(ThreadPool PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-    $<INSTALL_INTERFACE:include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
-# 以下为安装配置，方便将编译好的产物(dll, lib, 头文件)集中到一个目录
-# 在命令行使用 `cmake --install . --prefix ./install/` 即可将结果输出到本地 install 目录下
-include(GNUInstallDirs)
+# 便于在 FetchContent/add_subdirectory 场景下使用统一命名空间目标
+add_library(ThreadPool::ThreadPool ALIAS ThreadPool)
+
+set(THREADPOOL_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/ThreadPool")
 
 install(TARGETS ThreadPool
     EXPORT ThreadPoolTargets
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}   # Windows 下的 .dll 文件
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}   # Windows 下的 .lib (导入库) 或者 Linux 下的 .so
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}   # 静态库 / 导入库
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
 install(FILES ThreadPool.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}       # 头文件
+)
+
+install(EXPORT ThreadPoolTargets
+    FILE ThreadPoolTargets.cmake
+    NAMESPACE ThreadPool::
+    DESTINATION ${THREADPOOL_INSTALL_CMAKEDIR}
+)
+
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/ThreadPoolConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ThreadPoolConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/ThreadPoolConfig.cmake"
+    INSTALL_DESTINATION ${THREADPOOL_INSTALL_CMAKEDIR}
+)
+
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/ThreadPoolConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/ThreadPoolConfigVersion.cmake"
+    DESTINATION ${THREADPOOL_INSTALL_CMAKEDIR}
 )
