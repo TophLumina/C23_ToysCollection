@@ -21,7 +21,7 @@ add_library(ThreadPool SHARED
 )
 
 # 链接线程库
-target_link_libraries(ThreadPool PRIVATE Threads::Threads)
+target_link_libraries(ThreadPool PUBLIC Threads::Threads)
 
 # 在源码树和安装树都暴露头文件目录
 target_include_directories(ThreadPool PUBLIC
